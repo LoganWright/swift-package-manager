@@ -16,22 +16,24 @@ extension Package {
     func modules() throws -> [Module] {
 
         guard !Path.join(path, "module.modulemap").isFile else {
-            return [CModule(name: name, path: path)]
+            return [try CModule(name: name, path: path, pkgConfig: manifest.package.pkgConfig, providers: manifest.package.providers)]
         }
 
         let srcroot = try sourceRoot()
 
         if srcroot != path {
-            guard walk(path, recursively: false).filter(isValidSource).isEmpty else {
-                throw ModuleError.InvalidLayout(.InvalidLayout)
+            let invalidRootFiles = walk(path, recursively: false).filter(isValidSource)
+            guard invalidRootFiles.isEmpty else {
+                throw ModuleError.InvalidLayout(.InvalidLayout(invalidRootFiles))
             }
         }
 
         let maybeModules = walk(srcroot, recursively: false).filter(shouldConsiderDirectory)
 
         if maybeModules.count == 1 && maybeModules[0] != srcroot {
-            guard walk(srcroot, recursively: false).filter(isValidSource).isEmpty else {
-                throw ModuleError.InvalidLayout(.InvalidLayout)
+            let invalidModuleFiles = walk(srcroot, recursively: false).filter(isValidSource)
+            guard invalidModuleFiles.isEmpty else {
+                throw ModuleError.InvalidLayout(.InvalidLayout(invalidModuleFiles))
             }
         }
 
@@ -83,11 +85,11 @@ extension Package {
         
         if !cSources.isEmpty {
             guard swiftSources.isEmpty else { throw Module.Error.MixedSources(path) }
-            return ClangModule(name: name, sources: Sources(paths: cSources, root: path))
+            return try ClangModule(name: name, sources: Sources(paths: cSources, root: path))
         }
         
         guard !swiftSources.isEmpty else { throw Module.Error.NoSources(path) }
-        return SwiftModule(name: name, sources: Sources(paths: swiftSources, root: path)) 
+        return try SwiftModule(name: name, sources: Sources(paths: swiftSources, root: path))
     }
 
     func isValidSource(_ path: String) -> Bool {

@@ -24,7 +24,9 @@ XCTMain([
     testCase(ManifestTests.allTests),
     testCase(MiscellaneousTestCase.allTests),
     testCase(ManifestParserTestSuite.PackageTests.allTests),
-    testCase(ModuleTests.allTests),
+    testCase(ModuleDependencyTests.allTests),
+    testCase(ValidSourcesTests.allTests),
+    testCase(PrimitiveResolutionTests.allTests),
     testCase(PackageDescriptionTestSuite.PackageTests.allTests),
     testCase(PackageTypeTestSuite.PackageTests.allTests),
     testCase(PathTests.allTests),
@@ -41,4 +43,5 @@ XCTMain([
     testCase(ModuleMapsTestCase.allTests),
     testCase(DescribeTests.allTests),
     testCase(GitUtilityTests.allTests),
+    testCase(PackageVersionDataTests.allTests),
 ])

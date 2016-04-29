@@ -52,6 +52,7 @@ extension Command {
         case .Library(.Static):
             args.append(outpath)
         case .Test:
+            args += ["-module-name", product.name]
           #if os(OSX)
             args += ["-Xlinker", "-bundle"]
             args += ["-F", try platformFrameworksPath()]
@@ -81,7 +82,11 @@ extension Command {
         case .Executable:
             args.append("-emit-executable")
         }
-
+        
+        for module in product.modules {
+            args += try module.pkgConfigArgs()
+        }
+        
         args += objects
 
         if case .Library(.Static) = product.type {

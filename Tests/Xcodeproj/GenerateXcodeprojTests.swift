@@ -16,7 +16,7 @@ import XCTest
 
 
 // copy pasta
-func mktmpdir(_ file: StaticString = #file, line: UInt = #line, @noescape body: (String) throws -> Void) {
+func mktmpdir(_ file: StaticString = #file, line: UInt = #line, body: @noescape(String) throws -> Void) {
     do {
         try POSIX.mkdtemp("spm-tests") { dir in
             defer { _ = try? rmtree(dir) }
@@ -42,13 +42,13 @@ class TestGeneration: XCTestCase {
 
     func testXcodeBuildCanParseIt() {
         mktmpdir { dstdir in
-            func dummy() -> [XcodeModuleProtocol] {
-                return [SwiftModule(name: "DummyModuleName", sources: Sources(paths: [], root: dstdir))]
+            func dummy() throws -> [XcodeModuleProtocol] {
+                return [try SwiftModule(name: "DummyModuleName", sources: Sources(paths: [], root: dstdir))]
             }
 
             let projectName = "DummyProjectName"
             let srcroot = dstdir
-            let modules = dummy()
+            let modules = try dummy()
             let products: [Product] = []
 
             let outpath = try Xcodeproj.generate(dstdir: dstdir, projectName: projectName, srcroot: srcroot, modules: modules, externalModules: [], products: products, options: ([], [], []))

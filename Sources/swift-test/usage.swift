@@ -9,19 +9,21 @@ See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
 import OptionsParser
+import Multitool
 
 func usage(_ print: (String) -> Void = { print($0) }) {
-    //.........10.........20.........30.........40.........50.........60.........70..
+    //     .........10.........20.........30.........40.........50.........60.........70..
     print("OVERVIEW: Build and run tests")
     print("")
     print("USAGE: swift test [specifier] [options]")
     print("")
     print("SPECIFIER:")
-    print("  TestModule.TestCase         Run a test case subclass")
-    print("  TestModule.TestCase/test1   Run a specific test method")
+    print("  -s TestModule.TestCase         Run a test case subclass")
+    print("  -s TestModule.TestCase/test1   Run a specific test method")
     print("")
     print("OPTIONS:")
-    print("  --chdir         Change working directory before any other operation [-C]")
+    print("  --chdir              Change working directory before any other operation [-C]")
+    print("  --build-path <path>  Specify build directory")
 }
 
 enum Mode: Argument, Equatable, CustomStringConvertible {
@@ -32,6 +34,9 @@ enum Mode: Argument, Equatable, CustomStringConvertible {
         switch argument {
         case "--help", "--usage", "-h":
             self = .Usage
+        case "-s":
+            guard let specifier = pop() else { throw OptionsParser.Error.ExpectedAssociatedValue(argument) }
+            self = .Run(specifier)
         default:
             return nil
         }
@@ -65,16 +70,12 @@ enum Flag: Argument {
     }
 }
 
-struct Options {
-    var chdir: String? = nil
-}
-
 func parse(commandLineArguments args: [String]) throws -> (Mode, Options) {
     let mode: Mode?
     let flags: [Flag]
     (mode, flags) = try OptionsParser.parse(arguments: args)
 
-    var opts = Options()
+    let opts = Options()
     for flag in flags {
         switch flag {
         case .chdir(let path):

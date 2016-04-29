@@ -24,9 +24,12 @@ public protocol Toolchain {
 }
 
 func platformFrameworksPath() throws -> String {
-    guard let  popened = try? POSIX.popen(["xcrun", "--sdk", "macosx", "--show-sdk-platform-path"]),
-        let chuzzled = popened.chuzzle() else {
-            throw Error.InvalidPlatformPath
+    // Lazily compute the platform the first time it is needed.
+    struct Static {
+        static let value = { try? POSIX.popen(["xcrun", "--sdk", "macosx", "--show-sdk-platform-path"]) }()
+    }
+    guard let popened = Static.value, let chuzzled = popened.chuzzle() else {
+        throw Error.InvalidPlatformPath
     }
     return Path.join(chuzzled, "Developer/Library/Frameworks")
 }
@@ -173,3 +176,35 @@ extension Product {
         return ((), plist: s)
     }
 }
+
+extension SystemPackageProvider {
+    
+    var installText: String {
+        switch self {
+        case .Brew(let name):
+            return "    brew install \(name)\n"
+        case .Apt(let name):
+            return "    apt-get install \(name)\n"
+        }
+    }
+    
+    var isAvailable: Bool {
+        guard let platform = Platform.currentPlatform else { return false }
+        switch self {
+        case .Brew(_):
+            if case .Darwin = platform  {
+                return true
+            }
+        case .Apt(_):
+            if case .Linux(.Debian) = platform  {
+                return true
+            }
+        }
+        return false
+    }
+    
+    static func providerForCurrentPlatform(providers: [SystemPackageProvider]) -> SystemPackageProvider? {
+        return providers.filter{ $0.isAvailable }.first
+    }
+}
+

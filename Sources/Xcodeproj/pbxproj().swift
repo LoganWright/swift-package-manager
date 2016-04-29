@@ -53,7 +53,7 @@ public func pbxproj(srcroot: String, projectRoot: String, modules: [XcodeModuleP
     print("            isa = PBXFileReference;")
     print("            lastKnownFileType = sourcecode.swift;")
     print("            name = '\(packageSwift.1)';")
-    print("            path = '\(packageSwift.2)';")
+    print("            path = '\(Path(packageSwift.2).relative(to: projectRoot))';")
     print("            sourceTree = '<group>';")
     print("        };")
 
@@ -165,22 +165,26 @@ public func pbxproj(srcroot: String, projectRoot: String, modules: [XcodeModuleP
     print("            sourceTree = '<group>';")
     print("        };")
 
-    ////// “Dependencies” group
-    print("        \(dependenciesGroupReference) = {")
-    print("            isa = PBXGroup;")
-    print("            children = (" + externalModules.map{ $0.groupReference }.joined(separator: ", ") + ");")
-    print("            name = Dependencies;")
-    print("            sourceTree = '<group>';")
-    print("        };")
+    if !externalModules.isEmpty {
+        ////// “Dependencies” group
+        print("        \(dependenciesGroupReference) = {")
+        print("            isa = PBXGroup;")
+        print("            children = (" + externalModules.map{ $0.groupReference }.joined(separator: ", ") + ");")
+        print("            name = Dependencies;")
+        print("            sourceTree = '<group>';")
+        print("        };")
+    }
 
 ////// “Tests” group
-    print("        \(testsGroupReference) = {")
-    print("            isa = PBXGroup;")
-    print("            children = (" + tests.map{ $0.groupReference }.joined(separator: ", ") + ");")
-    print("            name = Tests;")
-    print("            sourceTree = '<group>';")
-    print("        };")
-    
+    if !tests.isEmpty {
+        print("        \(testsGroupReference) = {")
+        print("            isa = PBXGroup;")
+        print("            children = (" + tests.map{ $0.groupReference }.joined(separator: ", ") + ");")
+        print("            name = Tests;")
+        print("            sourceTree = '<group>';")
+        print("        };")
+    }
+
     var productReferences: [String] = []
     
     if !tests.isEmpty {

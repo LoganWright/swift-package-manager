@@ -11,9 +11,10 @@
 import protocol Build.Toolchain
 import enum Build.Configuration
 import OptionsParser
+import Multitool
 
 func usage(_ print: (String) -> Void = { print($0) }) {
-         //.........10.........20.........30.........40.........50.........60.........70..
+    //     .........10.........20.........30.........40.........50.........60.........70..
     print("OVERVIEW: Build sources into binary products")
     print("")
     print("USAGE: swift build [mode] [options]")
@@ -21,22 +22,26 @@ func usage(_ print: (String) -> Void = { print($0) }) {
     print("MODES:")
     print("  --configuration <value>        Build with configuration (debug|release) [-c]")
     print("  --clean[=<mode>]               Delete artefacts (build|dist) [-k]")
-    print("  --init <mode>                  Create a package template (executable|library)")
+    print("  --init[=<mode>]                Create a package template (executable|library)")
     print("  --fetch                        Fetch package dependencies")
-    print("  --generate-xcodeproj [<path>]  Generates an Xcode project [-X]")
+    print("  --update                       Update package dependencies")
+    print("  --generate-xcodeproj[=<path>]  Generates an Xcode project [-X]")
     print("")
     print("OPTIONS:")
-    print("  --chdir <path>     Change working directory before any other operation [-C]")
-    print("  -v[v]              Increase verbosity of informational output")
-    print("  -Xcc <flag>        Pass flag through to all C compiler instantiations")
-    print("  -Xlinker <flag>    Pass flag through to all linker instantiations")
-    print("  -Xswiftc <flag>    Pass flag through to all Swift compiler instantiations")
+    print("  --chdir <path>       Change working directory before any other operation [-C]")
+    print("  --build-path <path>  Specify build directory")
+    print("  -v[v]                Increase verbosity of informational output")
+    print("  -Xcc <flag>          Pass flag through to all C compiler instantiations")
+    print("  -Xlinker <flag>      Pass flag through to all linker instantiations")
+    print("  -Xswiftc <flag>      Pass flag through to all Swift compiler instantiations")
 }
 
 enum Mode: Argument, Equatable, CustomStringConvertible {
     case Build(Configuration, Toolchain)
     case Clean(CleanMode)
+    case Doctor
     case Fetch
+    case Update
     case Init(InitMode)
     case Usage
     case Version
@@ -44,12 +49,16 @@ enum Mode: Argument, Equatable, CustomStringConvertible {
 
     init?(argument: String, pop: () -> String?) throws {
         switch argument {
-        case "--configuration", "--conf":
+        case "--configuration", "--conf", "-c":
             self = try .Build(Configuration(pop()), UserToolchain())
         case "--clean":
             self = try .Clean(CleanMode(pop()))
+        case "--doctor":
+            self = .Doctor
         case "--fetch":
             self = .Fetch
+        case "--update":
+            self = .Update
         case "--init", "--initialize":
             self = try .Init(InitMode(pop()))
         case "--help", "--usage", "-h":
@@ -65,10 +74,12 @@ enum Mode: Argument, Equatable, CustomStringConvertible {
 
     var description: String {
         switch self {
-            case .Build(let conf): return "--configuration=\(conf)"
-            case .Clean(let cleanMode): return "--clean=\(cleanMode)"
+            case .Build(let conf, _): return "--configuration=\(conf)"
+            case .Clean(let mode): return "--clean=\(mode)"
+            case .Doctor: return "--doctor"
             case .GenerateXcodeproj: return "--generate-xcodeproj"
             case .Fetch: return "--fetch"
+            case .Update: return "--update"
             case .Init(let mode): return "--init=\(mode)"
             case .Usage: return "--help"
             case .Version: return "--version"
@@ -82,6 +93,7 @@ enum Flag: Argument {
     case chdir(String)
     case Xswiftc(String)
     case verbose(Int)
+    case buildPath(String)
 
     init?(argument: String, pop: () -> String?) throws {
 
@@ -91,7 +103,7 @@ enum Flag: Argument {
         }
 
         switch argument {
-        case "--chdir", "-C":
+        case Multitool.Flag.chdir, Multitool.Flag.C:
             self = try .chdir(forcePop())
         case "--verbose", "-v":
             self = .verbose(1)
@@ -103,14 +115,15 @@ enum Flag: Argument {
             self = try .Xld(forcePop())
         case "-Xswiftc":
             self = try .Xswiftc(forcePop())
+        case "--build-path":
+            self = try .buildPath(forcePop())
         default:
             return nil
         }
     }
 }
 
-struct Options {
-    var chdir: String? = nil
+class Options: Multitool.Options {
     var verbosity: Int = 0
     var Xcc: [String] = []
     var Xld: [String] = []
@@ -122,7 +135,7 @@ func parse(commandLineArguments args: [String]) throws -> (Mode, Options) {
     let flags: [Flag]
     (mode, flags) = try OptionsParser.parse(arguments: args)
 
-    var opts = Options()
+    let opts = Options()
     for flag in flags {
         switch flag {
         case .chdir(let path):
@@ -135,6 +148,8 @@ func parse(commandLineArguments args: [String]) throws -> (Mode, Options) {
             opts.Xld.append(value)
         case .Xswiftc(let value):
             opts.Xswiftc.append(value)
+        case .buildPath(let path):
+            opts.path.build = path
         }
     }
 
@@ -162,10 +177,10 @@ enum CleanMode: CustomStringConvertible {
 
     private init(_ rawValue: String?) throws {
         switch rawValue?.lowercased() {
-        case "build"?:
-            self = Build
-        case nil, "dist"?, "distribution"?:
-            self = Dist
+        case nil, "build"?:
+            self = .Build
+        case "dist"?, "distribution"?:
+            self = .Dist
         default:
             throw OptionsParser.Error.InvalidUsage("invalid clean mode: \(rawValue)")
         }
@@ -185,9 +200,9 @@ enum InitMode: CustomStringConvertible {
     private init(_ rawValue: String?) throws {
         switch rawValue?.lowercased() {
         case "library"?, "lib"?:
-            self = Library
+            self = .Library
         case nil, "executable"?, "exec"?, "exe"?:
-            self = Executable
+            self = .Executable
         default:
             throw OptionsParser.Error.InvalidUsage("invalid initialization mode: \(rawValue)")
         }

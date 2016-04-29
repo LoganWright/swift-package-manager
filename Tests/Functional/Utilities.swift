@@ -21,7 +21,7 @@ import class Foundation.NSBundle
 #endif
 
 
-func fixture(name fixtureName: String, tags: [String] = [], file: StaticString = #file, line: UInt = #line, @noescape body: (String) throws -> Void) {
+func fixture(name fixtureName: String, tags: [String] = [], file: StaticString = #file, line: UInt = #line, body: @noescape(String) throws -> Void) {
 
     func gsub(_ input: String) -> String {
         return input.characters.split(separator: "/").map(String.init).joined(separator: "_")
@@ -73,6 +73,24 @@ func fixture(name fixtureName: String, tags: [String] = [], file: StaticString =
     }
 }
 
+func initGitRepo(_ dstdir: String, tag: String? = nil, file: StaticString = #file, line: UInt = #line) {
+    do {
+        let file = Path.join(dstdir, "file.swift")
+        try popen(["touch", file])
+        try popen(["git", "-C", dstdir, "init"])
+        try popen(["git", "-C", dstdir, "config", "user.email", "example@example.com"])
+        try popen(["git", "-C", dstdir, "config", "user.name", "Example Example"])
+        try popen(["git", "-C", dstdir, "add", "."])
+        try popen(["git", "-C", dstdir, "commit", "-m", "msg"])
+        if let tag = tag {
+            try popen(["git", "-C", dstdir, "tag", tag])
+        }
+    }
+    catch {
+        XCTFail("\(error)", file: file, line: line)
+    }
+}
+
 enum Configuration {
     case Debug
     case Release
@@ -100,8 +118,14 @@ func executeSwiftBuild(_ chdir: String, configuration: Configuration = .Debug, p
     case "swiftc"?, nil:
         //FIXME Xcode should set this during tests
         // rdar://problem/24134324
-        let bindir = Path.join(getenv("XCODE_DEFAULT_TOOLCHAIN_OVERRIDE")!, "usr/bin")
-        env["SWIFT_EXEC"] = Path.join(bindir, "swiftc")
+        let swiftc: String
+        if let base = getenv("XCODE_DEFAULT_TOOLCHAIN_OVERRIDE")?.chuzzle() {
+            swiftc = Path.join(base, "usr/bin/swiftc")
+        } else {
+            swiftc = try popen(["xcrun", "--find", "swiftc"]).chuzzle() ?? "BADPATH"
+        }
+        precondition(swiftc != "/usr/bin/swiftc")
+        env["SWIFT_EXEC"] = swiftc
     default:
         fatalError("HURRAY! This is fixed")
     }
@@ -131,7 +155,7 @@ func executeSwiftBuild(_ chdir: String, configuration: Configuration = .Debug, p
     }
 }
 
-func mktmpdir(_ file: StaticString = #file, line: UInt = #line, @noescape body: (String) throws -> Void) {
+func mktmpdir(_ file: StaticString = #file, line: UInt = #line, body: @noescape(String) throws -> Void) {
     do {
         try POSIX.mkdtemp("spm-tests") { dir in
             defer { _ = try? rmtree(dir) }
